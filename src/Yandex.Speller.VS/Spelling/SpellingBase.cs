@@ -6,8 +6,6 @@ using System.Threading;
 using System.Windows.Threading;
 using Microsoft.VisualStudio.Text;
 using Microsoft.VisualStudio.Text.Tagging;
-using Yandex.Speller.Api;
-using Yandex.Speller.Api.DataContract;
 using Yandex.Speller.VS.Dictionary;
 using Yandex.Speller.VS.Tags;
 
@@ -23,11 +21,11 @@ namespace Yandex.Speller.VS.Spelling
 		private volatile List<MisspellingTag> _misspellings;
 		private DispatcherTimer _timer;
 		private Thread _updateThread;
-		private static readonly IYandexDictionary _dictionary = new Factory().CreateYandexDictionary();
-		protected SpellingBase(ITextBuffer buffer, ITagAggregator<T> TextTagger)
+		private readonly IYandexDictionary _dictionary = new Factory().CreateYandexDictionary();
+		protected SpellingBase(ITextBuffer buffer, ITagAggregator<T> textTagger)
 		{
 			_buffer = buffer;
-			_textTagger = TextTagger;
+			_textTagger = textTagger;
 			_dispatcher = Dispatcher.CurrentDispatcher;			
 
 			_dirtySpans = new List<SnapshotSpan>();
@@ -46,15 +44,9 @@ namespace Yandex.Speller.VS.Spelling
 		}
 
 		/// <summary />
-		protected IYandexDictionary Dictionary
-		{
-			get
-			{
-				return _dictionary;
-			}
-		}
+		protected IYandexDictionary Dictionary => _dictionary;
 
-		public IEnumerable<ITagSpan<IMisspellingTag>> GetTags(NormalizedSnapshotSpanCollection spans)
+	    public IEnumerable<ITagSpan<IMisspellingTag>> GetTags(NormalizedSnapshotSpanCollection spans)
 		{
 			if (spans.Count == 0)
 				yield break;
@@ -87,12 +79,8 @@ namespace Yandex.Speller.VS.Spelling
 				return;
 
 			var dirtySpan = new SnapshotSpan(_buffer.CurrentSnapshot, dirtySpans[0].Start, dirtySpans[dirtySpans.Count - 1].End);
-
 			AddDirtySpan(dirtySpan);
-
-			EventHandler<SnapshotSpanEventArgs> temp = TagsChanged;
-			if (temp != null)
-				temp(this, new SnapshotSpanEventArgs(dirtySpan));
+            TagsChanged?.Invoke(this, new SnapshotSpanEventArgs(dirtySpan));
 		}
 
 		private void DictionaryUpdated(object sender, AddedWordToDictionaryEventArgs e)
@@ -233,11 +221,8 @@ namespace Yandex.Speller.VS.Spelling
 
 					_dispatcher.Invoke(() =>
 					{
-						_misspellings = currentMisspellings;
-
-						EventHandler<SnapshotSpanEventArgs> temp = TagsChanged;
-						if (temp != null)
-							temp(this, new SnapshotSpanEventArgs(dirtySpan));
+					    _misspellings = currentMisspellings;
+                        TagsChanged?.Invoke(this, new SnapshotSpanEventArgs(dirtySpan));
 					});
 				}
 			}
@@ -245,7 +230,7 @@ namespace Yandex.Speller.VS.Spelling
 			lock (_dirtySpanLock)
 			{
 				if (_dirtySpans.Count != 0)
-					_dispatcher.Invoke(() => ScheduleUpdate());
+					_dispatcher.Invoke(ScheduleUpdate);
 			}
 		}
 
